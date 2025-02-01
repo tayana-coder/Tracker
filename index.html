@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6 transition-all duration-300">
+
+    <!-- Toggle Button -->
+    <div class="text-center mb-4">
+        <button onclick="toggleTheme()" class="bg-gray-800 text-white px-4 py-2 rounded-md">Toggle Dark/Light</button>
+    </div>
+
+    <div class="max-w-5xl mx-auto grid grid-cols-2 gap-6">
+        <!-- Editor Mode -->
+        <div class="bg-white p-6 rounded-lg shadow-md transition-all duration-300">
+            <h2 class="text-2xl font-bold mb-4">Editor Mode ✏️</h2>
+            <div class="mb-4">
+                <label class="block font-semibold">Amount 💰</label>
+                <input type="number" id="amount" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400">
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold">Topic 📌</label>
+                <select id="topic" class="w-full p-2 border rounded">
+                    <option value="Food">🍔 Food</option>
+                    <option value="Shopping">🛍️ Shopping</option>
+                    <option value="Travel">✈️ Travel</option>
+                    <option value="Fun">🎉 Fun</option>
+                    <option value="Other">📌 Other</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold">Note 📝</label>
+                <textarea id="note" class="w-full p-2 border rounded focus:ring-2 focus:ring-blue-400" rows="2"></textarea>
+            </div>
+            <button onclick="saveData()" class="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 transition-all duration-200">Save Entry</button>
+        </div>
+
+        <!-- View Mode -->
+        <div class="bg-white p-6 rounded-lg shadow-md transition-all duration-300">
+            <h2 class="text-2xl font-bold mb-4">View Mode 📊</h2>
+            
+            <div class="text-xl font-bold text-blue-600 mb-4">
+                Total Amount: <span id="total-amount">0</span>
+            </div>
+
+            <canvas id="dataChart" class="mt-4"></canvas>
+
+            <!-- Hidden details section -->
+            <div id="details-section" class="mt-4 hidden">
+                <h3 class="text-lg font-semibold text-blue-700" id="selected-category-title"></h3>
+                <table class="w-full border-collapse border border-gray-300 mt-2">
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="border p-2">Amount</th>
+                            <th class="border p-2">Note</th>
+                            <th class="border p-2">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let data = JSON.parse(localStorage.getItem("storedData")) || [];
+
+        function saveData() {
+            const amount = document.getElementById("amount").value;
+            const topic = document.getElementById("topic").value;
+            const note = document.getElementById("note").value;
+
+            if (!amount || !topic) {
+                alert("Amount and Topic are required!");
+                return;
+            }
+
+            data.push({ amount: parseFloat(amount), topic, note });
+            localStorage.setItem("storedData", JSON.stringify(data));
+            document.getElementById("amount").value = "";
+            document.getElementById("note").value = "";
+            updateView();
+        }
+
+        function deleteEntry(index) {
+            data.splice(index, 1);
+            localStorage.setItem("storedData", JSON.stringify(data));
+            updateView();
+            document.getElementById("details-section").classList.add("hidden");
+        }
+
+        function updateView() {
+            let totalAmount = data.reduce((sum, entry) => sum + entry.amount, 0);
+            document.getElementById("total-amount").innerText = totalAmount;
+            renderChart();
+        }
+
+        function renderChart() {
+            const ctx = document.getElementById("dataChart").getContext("2d");
+            if (window.myChart) {
+                window.myChart.destroy();
+            }
+
+            const topics = ["Food", "Shopping", "Travel", "Fun", "Other"];
+            const amounts = topics.map(topic => data.filter(d => d.topic === topic).reduce((sum, entry) => sum + entry.amount, 0));
+
+            window.myChart = new Chart(ctx, {
+                type: "bar",
+                data: {
+                    labels: topics,
+                    datasets: [{
+                        label: "Total Amount",
+                        data: amounts,
+                        backgroundColor: ["#4CAF50", "#FF9800", "#2196F3", "#E91E63", "#9C27B0"],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            showDetails(topics[index]);
+                        }
+                    }
+                }
+            });
+        }
+
+        function showDetails(category) {
+            document.getElementById("details-section").classList.remove("hidden");
+            document.getElementById("selected-category-title").innerText = `Details for ${category}`;
+            
+            const tableBody = document.getElementById("data-table");
+            tableBody.innerHTML = "";
+
+            data.forEach((entry, index) => {
+                if (entry.topic === category) {
+                    const row = `<tr class="border">
+                                    <td class="border p-2">${entry.amount}</td>
+                                    <td class="border p-2">${entry.note || "-"}</td>
+                                    <td class="border p-2 text-center">
+                                        <button onclick="deleteEntry(${index})" class="bg-red-500 text-white px-2 py-1 rounded hover:bg-red-600">❌</button>
+                                    </td>
+                                </tr>`;
+                    tableBody.innerHTML += row;
+                }
+            });
+        }
+
+        function toggleTheme() {
+            document.body.classList.toggle("bg-gray-900");
+            document.body.classList.toggle("text-white");
+            const containers = document.querySelectorAll(".bg-white");
+            containers.forEach(container => {
+                container.classList.toggle("bg-gray-800");
+                container.classList.toggle("text-white");
+            });
+        }
+
+        updateView();
+    </script>
+
+</body>
+</html>
